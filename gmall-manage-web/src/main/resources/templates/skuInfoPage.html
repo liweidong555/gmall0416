@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+
+<div id="sku_dlg" class="easyui-dialog" title="编辑sku" style="width:700px;height:520px;"
+     closed="true"  data-options="iconCls:'icon-save',resizable:true,modal:false" buttons="#skuBtns" >
+    <form id="skuForm">
+        <br/>
+        <label>sku名称:</label>
+        <input  id="skuName" name="skuName" class="easyui-textbox" data-options="" style="width:300px;"/>
+        <br/><br/>
+        <label>商品价格:</label>
+        <input  id="price" name="price" class="easyui-numberbox" data-options="min:0,precision:2" style="width:300px;"/>
+        <br/><br/>
+        <label>商品重量（千克):</label>
+        <input  id="weight" name="weight" class="easyui-numberbox" data-options="min:0,precision:2" style="width:300px;"/>
+        <br/><br/>
+        <label>商品规格描述:</label>
+        <input  id="skuDesc" name="skuDesc" class="easyui-textbox" data-options="multiline:true" style="width:500px;height:100px"/>
+
+
+        <!--隐藏域spuId-->
+        <input id="spuIdForSku" name="spuId" type="hidden"/>
+        <!--隐藏域id-->
+        <input id="skuId" name="id" type="hidden"/>
+        <!--隐藏域catalog3Id-->
+        <input id="catalog3IdForSku" name="catalog3Id" type="hidden"/>
+        <br/><br/>
+        <!--隐藏域skuInfo对象-->
+        <input id="skuInfo" name="skuInfo" type="hidden"/>
+
+
+        <div id="attrInfoGroup"  title="平台属性" class="easyui-panel" style="padding:5px;" ></div>
+        <div id="spuSaleAttrGroup" title="销售属性" class="easyui-panel" style="padding:5px;" ></div>
+
+        <!----------------商品图片列表 ----------------------->
+
+        <table id="skuImgDg" class="easyui-datagrid" title="商品图片列表"
+               data-options="singleSelect:false,selectOnCheck:false,method:'get'" ></table>
+
+        <br/><br/>
+    </form>
+</div>
+<!----------------弹出框的按钮组----------------------->
+<div id="skuBtns">
+    <a href="#" class="easyui-linkbutton" onclick="saveSku()">保 存</a>
+    <a href="#" class="easyui-linkbutton" onclick="closeSku()">关 闭</a>
+</div>
+
+<script type="text/javascript">
+
+    //保存
+    function saveSku() {
+        var skuInfo = {};
+        //拼接属性赋值
+        skuInfo["skuName"] = $("#skuName").val();
+        skuInfo["skuDesc"] = $("#skuDesc").val();
+        skuInfo["price"] = $("#price").val();
+        skuInfo["weight"] = $("#weight").val();
+        skuInfo["spuId"] = $("#spuIdForSku").val();
+        skuInfo["id"] = $("#skuId").val();
+        skuInfo["catalog3Id"] = $("#catalog3IdForSku").val();
+
+        //图片列表
+        skuImgDgendEdit();//首先编辑图片
+        var skuImgDgRows = $("#skuImgDg").datagrid('getChecked');
+        for (var i = 0; i < skuImgDgRows.length; i++) {
+            console.log("checkflag:"+skuImgDgRows[i].checkFlag);
+
+            //要跟bean中字段对齐
+            skuInfo["skuImageList[" + i + "].imgName"] = skuImgDgRows[i].imgName;
+            skuInfo["skuImageList[" + i + "].imgUrl"] = skuImgDgRows[i].imgUrl;
+            if(skuImgDgRows[i].isDefault=='1'){
+                skuInfo["skuDefaultImg"]=skuImgDgRows[i].imgUrl;
+            }
+            skuInfo["skuImageList[" + i + "].spuImgId"] = skuImgDgRows[i].id;
+            skuInfo["skuImageList[" + i + "].isDefault"] = skuImgDgRows[i].isDefault;
+        }
+
+        //平台属性 保存
+        //先获取到select中option
+        var attrInfoSelect = $("#attrInfoGroup").children("select");
+        //循环遍历
+        console.log("len:"+ attrInfoSelect.length);
+        for (var i = 0; i < attrInfoSelect.length; i++) {
+            //循环添加json赋值  attrId=平台属性Id，valueld=平台属性值Id
+            var valueId = attrInfoSelect.eq(i).find("option:selected").val();
+            //attr(","):给属性赋值，attr(""):获取属性值
+            var attrId=attrInfoSelect.eq(i).attr("attrId");
+            skuInfo["skuAttrValueList[" + i + "].attrId"]=attrId;
+            skuInfo["skuAttrValueList[" + i + "].valueId"]=valueId;
+
+        }
+
+        // 销售属性
+        var spuSaleAttrSelect = $("#spuSaleAttrGroup").children("select");
+        console.log("len:"+ attrInfoSelect.length);
+        for (var i = 0; i < spuSaleAttrSelect.length; i++) {
+            var saleAttrValueId = spuSaleAttrSelect.eq(i).find("option:selected").val();
+            var saleAttrValueName = spuSaleAttrSelect.eq(i).find("option:selected").text();
+            var saleAttrId=spuSaleAttrSelect.eq(i).attr("saleAttrId");
+            var saleAttrName=spuSaleAttrSelect.eq(i).attr("spuSaleAttrName");
+            skuInfo["skuSaleAttrValueList[" + i + "].saleAttrValueId"]=saleAttrValueId;
+            skuInfo["skuSaleAttrValueList[" + i + "].saleAttrValueName"]=saleAttrValueName;
+            skuInfo["skuSaleAttrValueList[" + i + "].saleAttrId"]=saleAttrId;
+            skuInfo["skuSaleAttrValueList[" + i + "].saleAttrName"]=saleAttrName;
+        }
+
+
+
+        console.log(JSON.stringify(skuInfo));
+
+        //ajax 保存到后台
+        $.post("saveSku", skuInfo, function (data) {
+            $("#sku_dlg").dialog("close");
+
+            $("#skulist_dg").datagrid("reload");
+        });
+    }
+    //首先编辑图片
+    function skuImgDgendEdit() {
+        var rows = $("#skuImgDg").datagrid("getRows");
+        for(i=0;i<rows.length;i++){
+            $("#skuImgDg").datagrid("endEdit",i);
+        }
+    }
+
+    //关闭页面
+    function closeSku(){
+        $("#sku_dlg").dialog("close");
+    }
+
+    //初始化spuInfo  spuRow.id=spuId, ''=skuInfo, ctg3val=catalog3Id;
+    //初始化  数据回显-编辑
+    function initSkuInfoDlg(spuId,skuInfo,catalog3Id){
+        //打开对话框
+        $('#sku_dlg').dialog("open");
+        console.log("初始化文本sku："+ JSON.stringify(skuInfo));
+
+        //初始化 表单
+        initSkuForm(spuId,catalog3Id)
+
+        //加载数据
+        loadSkuForm(skuInfo);
+
+        //初始化图片表格
+        initSkuImgListDatagrid(spuId) ;
+
+        //初始化
+        console.log("初始化销售属性!!!");
+        initSpuSaleAttrGroup(spuId,skuInfo);
+
+        console.log("初始化平台属性!!!");
+        initAttrInfoGroup(catalog3Id);
+
+        console.log("清理表单!!!");
+
+    }
+    //初始化表单
+    function initSkuForm(spuId,catalog3Id){
+
+        $("#skuForm").form('clear');
+        //给隐藏域spuId赋值
+        $("#spuIdForSku").val(spuId);
+        //给隐藏域的三级分类Id赋值
+        $("#catalog3IdForSku").val(catalog3Id);
+    }
+
+    function loadSkuForm(skuInfo){
+        console.log("开始加载sku表单："+skuInfo.id);
+        if(!skuInfo||!skuInfo.id){
+            return;
+        }
+        console.log("开始加载sku表单："+skuInfo.skuName);
+        $("#skuName").textbox('setValue',skuInfo.skuName);
+        $("#skuDesc").textbox('setValue',skuInfo.skuDesc);
+        $("#price").textbox('setValue', skuInfo.price);
+        $("#weight").textbox('setValue',skuInfo.weight);
+        $("#spuIdForSku").val(skuInfo.spuId);
+        $("#skuDefaultImg").val(skuInfo.skuDefaultImg);
+        $("#skuId").val(skuInfo.id);
+        $("#catalog3IdForSku").val(skuInfo.catalog3Id);
+        $("#skuInfo").val(JSON.stringify(skuInfo));//用于异步加载的 暂存
+        console.log("skuInfo in hidden:"+$("#skuInfo").val());
+
+    }
+
+    //初始化图片表格
+    function initSkuImgListDatagrid(spuId) {
+        $("#skuImgDg").datagrid({url:""});
+        $('#skuImgDg').datagrid('loadData', { total: 0, rows: [] });
+        console.log("初始化表格sku");
+        skuImgDg = $("#skuImgDg").datagrid({
+            columns:[[
+                { field:'checkFlag',checkbox:true},
+                { field:'id',title:'文件编号',width:'15%'},//隐藏文件页面内部编号
+                { field:'imgName',title:'图片简称',width:'30%'
+                },
+                { field:'imgUrl',title:'图片路径' ,width:'20%',
+                    formatter:function (value, row, index) {
+                        return "<img src="+row.imgUrl+" style='width:100px;height:100px;'>";
+                    }
+                },
+                { field:'isDefault',title:'是否默认图片' ,width:'20%',
+                    editor:{type: 'checkbox' ,
+                        options: {
+                            on:"1",
+                            off:"0"
+                        }
+                    }
+                }
+            ]],
+            onLoadSuccess: function () {   //隐藏表头的checkbox
+                console.log("共加载"+skuImgDg.datagrid("getRows").length+"行");
+                loadSkuImg(skuInfo);
+                skuImgDgbeginEdit();
+            }
+
+        });
+
+        console.log('加载图片数据'+spuId);
+        $('#skuImgDg').datagrid({url:'spuImageList?spuId='+spuId});
+    }
+    //加载图片
+    function loadSkuImg(){
+        if($("#skuInfo").val()==''){
+            return;
+        }
+        var skuInfo=JSON.parse($("#skuInfo").val());
+        console.log("加载sku图片:"+skuInfo+"||"+skuInfo.skuImageList);
+        if(!skuInfo||!skuInfo.skuImageList){
+            return;
+        }
+        console.log("加载sku图片:"+skuInfo+"||"+skuInfo.skuImageList);
+        var imgDg=$('#skuImgDg') ;
+        //获取所有行数据
+        var imgRows =imgDg.datagrid("getRows");
+        //获取所有skuInfo对象中的图片
+        var skuImgList=skuInfo.skuImageList;
+        //循环dg
+        for (var i = 0; i < imgRows.length; i++) {
+            var imgRow = imgRows[i];
+            //skuInfo对象中的图片列表
+            for (var j = 0; j < skuImgList.length; j++) {
+                var skuImg = skuImgList[j];
+                console.log("imgVs::::::"+skuImg.spuImgId+"||"+imgRow.id);
+                if(skuImg.spuImgId==imgRow.id){
+                    imgDg.datagrid("checkRow",i);
+                    imgDg.datagrid("updateRow",{index:i,row:{isDefault:skuImg.isDefault}});
+
+                }
+
+            }
+        }
+    }
+    //checkbox + dg 编辑
+    function skuImgDgbeginEdit() {
+        var skuImgDg = $("#skuImgDg");
+        var rows = skuImgDg.datagrid('getRows');
+        for (var i = 0; i < rows.length; i++) {
+            skuImgDg.datagrid('beginEdit', i);
+        }
+    }
+
+    //初始化销售属性
+    function initSpuSaleAttrGroup(spuId){
+        console.log("初始化销售属性");
+        var spuSaleAttrList={};
+        //spuSaleAttrGroup:通过spuId获取限售属性对象
+        $('#spuSaleAttrGroup').html("");
+        var spuSaleAttrGroup= $('#spuSaleAttrGroup');
+        $.get("spuSaleAttrList?spuId="+spuId,function(data){
+            console.log("spuSaleAttrList:"+ JSON.stringify(data));
+            //取得spuSaleAttrList集合，集合中包含：销售属性值集合
+            spuSaleAttrList=data;
+            for (var i = 0; i < spuSaleAttrList.length; i++) {
+                var spuSaleAttr = spuSaleAttrList[i];
+                //页面显示：属性名：属性值
+                var spuSaleAttrHtml='<span>'+spuSaleAttr.saleAttrName+':</span> <select saleAttrId="'+spuSaleAttr.saleAttrId+'"  spuSaleAttrName="'+spuSaleAttr.saleAttrName+'"  class="easyui-combobox"   style="width:100px">';
+                //循环属性值
+                for (var j = 0; j < spuSaleAttrList[i].spuSaleAttrValueList.length; j++) {
+                    //把属性追加到option
+                    var spuSaleAttrValue = spuSaleAttrList[i].spuSaleAttrValueList[j];
+                    var spuSaleAttrValueHtml='<option value="'+spuSaleAttrValue.id+'">'+spuSaleAttrValue.saleAttrValueName+'</option>';
+                    spuSaleAttrHtml=spuSaleAttrHtml+spuSaleAttrValueHtml;
+                }
+                spuSaleAttrHtml+='</select>';
+                console.log(spuSaleAttrHtml);
+                spuSaleAttrGroup.append($(spuSaleAttrHtml));
+            }
+            //做编辑的时候回显
+            loadSkuSaleAttr();
+        });
+    }
+    //回显数据
+    function loadSkuSaleAttr(){
+        if($("#skuInfo").val()==''){
+            return;
+        }
+        var skuInfo=JSON.parse($("#skuInfo").val());
+        console.log("开始加载sku销售属性："+skuInfo.skuSaleAttrValueList);
+        if(!skuInfo ||!skuInfo.skuSaleAttrValueList){
+            return;
+        }
+        var skuSaleAttrValueList=skuInfo.skuSaleAttrValueList;//这种叫js语法 js中 =:赋值 ==判断两边的值是否相等 ===判断两边的值是否相等,并且数据类型必须一致
+        var selects = $("#spuSaleAttrGroup").find("select");//找下拉列表  jquery语法需要使用eq判断是否相等
+        console.log(" selects.html()::"+ selects.html())
+        for (var i = 0; i < selects.length; i++) {
+            var select = selects.eq(i);
+            for (var j = 0; j < skuSaleAttrValueList.length; j++) {
+                console.log("SaleAttrVs::::::"+skuSaleAttrValueList[j].saleAttrId+"||"+select.attr("saleAttrId"));
+                if(skuSaleAttrValueList[j].saleAttrId==select.attr("saleAttrId")) {
+                    console.log("skuSaleAttrValueList[j].saleAttrValueId+++"+skuSaleAttrValueList[j].saleAttrValueId);
+                    select.val(skuSaleAttrValueList[j].saleAttrValueId);
+                }
+
+            }
+        }
+
+    }
+
+    //初始化平台属性
+    function initAttrInfoGroup(catalog3Id){
+        console.log("初始化平台属性:"+catalog3Id);
+        var attrInfoList={};
+        $('#attrInfoGroup').html("");
+        var attrInfoGroup= $('#attrInfoGroup');
+        $.get("attrInfoList?catalog3Id="+catalog3Id,function(data){
+            console.log("attrInfoList:"+ JSON.stringify(data));
+            attrInfoList=data;
+            for (var i = 0; i < attrInfoList.length; i++) {
+                var attrInfo = attrInfoList[i];
+                var attrInfoHtml='<span>'+attrInfo.attrName+':</span> <select attrId="'+attrInfo.id+'"   class="easyui-combobox"   style="width:100px">';
+
+                for (var j = 0; j < attrInfoList[i].attrValueList.length; j++) {
+
+                    var attrValue = attrInfoList[i].attrValueList[j];
+                    console.log(attrValue);
+                    var attrValueHtml='<option value="'+attrValue.id+'">'+attrValue.valueName+'</option>'
+                    attrInfoHtml=attrInfoHtml+attrValueHtml;
+                }
+                attrInfoHtml+='</select>';
+                console.log(attrInfoHtml);
+                attrInfoGroup.append($(attrInfoHtml));
+
+            }
+
+            loadSkuAttrInfo(skuInfo);
+
+        });
+    }
+
+    //回显平台属性数据
+    function loadSkuAttrInfo(){
+        if($("#skuInfo").val()==''){
+            return;
+        }
+        var skuInfo=JSON.parse($("#skuInfo").val())  ;
+        console.log("开始加载sku平台属性："+skuInfo.skuAttrValueList);
+        if(!skuInfo||!skuInfo.skuAttrValueList){
+            return;
+        }
+        var skuAttrValueList=skuInfo.skuAttrValueList;
+        var selects = $('#attrInfoGroup').find("select");
+        console.log(" selects.html():111:"+ selects.html());
+        for (var i = 0; i < selects.length; i++) {
+            var select = selects.eq(i);
+            for (var j = 0; j < skuAttrValueList.length; j++) {
+                console.log(" AttrVs::::::"+skuAttrValueList[j].attrId+"||"+select.attr("attrId"));
+                if(skuAttrValueList[j].attrId==select.attr("attrId")) {
+                    select.val(skuAttrValueList[j].valueId);
+                }
+            }
+        }
+    }
+
+</script>
+
+
+</body>
+</html>
