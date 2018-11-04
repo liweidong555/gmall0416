@@ -4,7 +4,7 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 
-//成功
+//成功111
 //初始化JedisPool配置参数。
 //从JedisPool中取得Jedis。
 public class RedisUtil {
